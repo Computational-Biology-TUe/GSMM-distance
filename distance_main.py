@@ -21,6 +21,7 @@ from scipy.spatial.distance import pdist , jaccard , squareform , hamming
 from matplotlib.pyplot import show
 from datetime import datetime
 import os
+import PIL
 
 def modelNet(model):
     #Returns a grakel.Graph object from a cobra.model object
@@ -114,8 +115,13 @@ def K_to_D(K):
     return D
 
 def savefig(plot, outfolder , title):
-    plot.get_figure().savefig(outfolder+title, dpi=300, bbox_inches='tight')
-       
+    plot.get_figure().savefig(outfolder+title, dpi=1200, bbox_inches='tight')
+
+def png2tif(outfolder):
+    for f in os.listdir(outfolder):
+        tif = PIL.Image.open(outfolder+f)
+        tif.save(outfolder+f[0:-3]+'tif')
+           
 def pw_dist_hist(M,metric):
     # plots hist of Kernel or Distance matrix
     
@@ -127,7 +133,9 @@ def pw_dist_hist(M,metric):
     M = M[M!=1]
     # reshape and plot hist
     M = M.values.reshape(10000,-1)
+      
     ax = pd.DataFrame(M).plot.hist(bins=100,figsize =(15,10),fontsize = 15, legend = False)
+    
     ax.set_xlabel(xlabel=metric,fontsize = 15)
     
     show()    
