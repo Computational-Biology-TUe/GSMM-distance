@@ -49,6 +49,7 @@ def make_binary_mat(library_folder,ref_model):
 
     for filename in sorted(os.listdir(library_folder)):
         model = cobra.io.read_sbml_model(library_folder+filename)
+        print("loading:", model.name)
         rxns = []
         mets = []
         genes = []
@@ -77,6 +78,7 @@ def make_binary_mat(library_folder,ref_model):
         metabolite_matrix[label] = pd.Series(mets).values
         gene_matrix[label] = pd.Series(genes).values
     
+    print("Done!")
     return reactions_matrix, metabolite_matrix, gene_matrix
 
 
@@ -96,9 +98,10 @@ ncbi.update_taxonomy_database()
 
 NCBI_ID = list(models_taxonomy['ncbiid'].dropna().values)
 NCBI_tree = ncbi.get_topology(NCBI_ID)
-NCBI_tree.set_outgroup(NCBI_tree.get_midpoint_outgroup())
 
+# Ugly way to convert "phyloTree" obj into "Tree" obj for comparison with other trees
 NCBI_tree.write(format=1, outfile="/home/acabbia/Documents/Muscle_Model/GSMM-distance/NCBI_tree.nw")
+NCBI_tree = Tree("/home/acabbia/Documents/Muscle_Model/GSMM-distance/NCBI_tree.nw", format = 1)
 
 #%%
 ##### 
@@ -131,7 +134,7 @@ DM_GK = DistanceMatrix(1-GK.values)
 #make GK tree
 sktree = nj(DM_GK, result_constructor=str)
 GK_tree = Tree(sktree)
-
+GK_tree.name = 'AGORA network similarity tree'
 # style
 ts = TreeStyle()
 ts.show_leaf_name = True
@@ -140,11 +143,8 @@ ts.arc_start = -180
 ts.arc_span = 360
 
 #plot tree
-GK_tree.render(file_name='/home/acabbia/Documents/Muscle_Model/GSMM-distance/figures/GK_tree_AGORA.png', tree_style=ts)
-GK_tree.show(tree_style=ts)
-
-# save tree
-GK_tree.write(format=1, outfile="/home/acabbia/Documents/Muscle_Model/GSMM-distance/GK_tree.nw")
+#GK_tree.render(file_name='/home/acabbia/Documents/Muscle_Model/GSMM-distance/figures/GK_tree_AGORA.png', tree_style=ts)
+#GK_tree.show(tree_style=ts)
 
 #%%
 ####
@@ -164,7 +164,8 @@ DM_JD = DistanceMatrix(JD.values)
 #make JD tree
 sktree = nj(DM_JD, result_constructor=str)
 JD_tree = Tree(sktree)
-        
+JD_tree.name = 'AGORA reactions similarity tree'
+ 
 # style
 ts = TreeStyle()
 ts.show_leaf_name = True
@@ -173,12 +174,10 @@ ts.arc_start = -180
 ts.arc_span = 360
 
 #plot tree
-JD_tree.render(file_name='/home/acabbia/Documents/Muscle_Model/GSMM-distance/figures/JD_tree_AGORA.png', tree_style=ts)
-
-# save tree
-JD_tree.write(format=1, outfile="/home/acabbia/Documents/Muscle_Model/GSMM-distance/JD_tree.nw")
+#JD_tree.render(file_name='/home/acabbia/Documents/Muscle_Model/GSMM-distance/figures/JD_tree_AGORA.png', tree_style=ts)
 
 #%%
+'''
 ####
 # Make FBA tree
 ####
@@ -203,8 +202,7 @@ for filename in sorted(os.listdir(model_library_folder)):
     model.reactions.get_by_id('EX_h2o(e)').bounds= -1000,1000    # h2o
     model.reactions.get_by_id('EX_co2(e)').bounds=     0,1000    # co2
     model.reactions.get_by_id('EX_hco3(e)').bounds=     0,1000    # hco3
-    model.reactions.get_by_id('EX_(e)').bounds=     0,1000    # h
-    model.reactions.get_by_id('HMR_(e)').bounds=     0,100     # glc
+    model.reactions.get_by_id('EX_h(e)').bounds=     0,1000    # h
     
     # optimize (loopless)
     sol = cobra.flux_analysis.loopless.loopless_solution(model)
@@ -244,8 +242,52 @@ FBA_tree.show(tree_style=ts)
 FBA_tree.write(format=1, outfile="/home/acabbia/Documents/Muscle_Model/GSMM-distance/FBA_tree.nw")
 
 #%%
-#Compare trees
+'''
 
-FBA_tree.compare(GK_tree)
+# dictionary to translate between model_taxonomy.index (GK and JD trees) and NCBI_id (NCBI tree)
+
+idx_str = [str(i) for i in list(models_taxonomy.index)]
+NCBI_str = [str(i) for i in NCBI_ID] 
+
+tr = dict(zip(idx_str,NCBI_str))
+
+#Annotate GK and JD trees with NCBI id's
+for leaf in GK_tree:
+    leaf.name = tr[leaf.name]
+    
+for leaf in JD_tree:
+    leaf.name = tr[leaf.name]
+
+# Write 
+GK_tree.write(format=1, outfile="/home/acabbia/Documents/Muscle_Model/GSMM-distance/GK_tree.nw")
+JD_tree.write(format=1, outfile="/home/acabbia/Documents/Muscle_Model/GSMM-distance/JD_tree.nw")
+
+### Compare trees with reference taxonomy (NCBI)
+resultGK = GK_tree.compare(NCBI_tree, unrooted = True)
+resultJD = JD_tree.compare(NCBI_tree, unrooted = True) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
