@@ -82,7 +82,6 @@ def make_binary_mat(library_folder,ref_model):
     return reactions_matrix, metabolite_matrix, gene_matrix
 
 
-
 model_library_folder = '/home/acabbia/Documents/Muscle_Model/models/AGORA_1.03/'
 ref_model_file = '/home/acabbia/Documents/Muscle_Model/models/AGORA_universe.xml'
 models_taxonomy = pd.read_csv('/home/acabbia/Documents/Muscle_Model/GSMM-distance/agora_taxonomy.tsv',sep = '\t').sort_values(by='organism')
