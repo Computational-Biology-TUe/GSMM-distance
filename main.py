@@ -9,6 +9,8 @@ import os
 import cobra 
 import pandas as pd
 import grakel as gk
+import seaborn as sns
+from matplotlib import pyplot as plt
 
 def binary(model, ref_model):
        
@@ -128,7 +130,7 @@ def load_library(path, ref_model_path):
         sol_df[label] = fluxes
         
     return reactions_matrix , metabolite_matrix , gene_matrix , graphlist , sol_df
-        
+
 #%%
     
 path_PDGSMM = '/home/acabbia/Documents/Muscle_Model/models/merged_100/'
@@ -136,12 +138,61 @@ path_AGORA = '/home/acabbia/Documents/Muscle_Model/models/AGORA_1.03/'
 
 path_ref_PDGSMM = '/home/acabbia/Documents/Muscle_Model/models/HMR2.xml'
 path_ref_AGORA = '/home/acabbia/Documents/Muscle_Model/models/AGORA_universe.xml'
-    
 
+
+# create labels
+label_PDGSM = [s.split('_')[0] for s in sorted(os.listdir(path_PDGSMM))]
+
+
+AGORA_taxonomy = pd.read_csv('/home/acabbia/Documents/Muscle_Model/GSMM-distance/agora_taxonomy.tsv',
+                 sep = '\t').sort_values(by='organism')
+
+AGORA_taxonomy.fillna(method='bfill', axis=0, inplace=True)
+
+### Replaces and aggregates classes with less than 10 samples into a new "Other" class
+for c in ['phylum','oxygenstat', 'gram', 'mtype', 'metabolism']:
+    for s in list(AGORA_taxonomy[c].value_counts()[AGORA_taxonomy[c].value_counts()<10].index):
+        AGORA_taxonomy[c].replace(s,'Other', inplace=True)
+
+
+label_AGORA_phylum = list(AGORA_taxonomy['phylum'].values)
+label_AGORA_oxy = list(AGORA_taxonomy['oxygenstat'].values)
+label_AGORA_gram = list(AGORA_taxonomy['gram'].values)
+label_AGORA_type = list(AGORA_taxonomy['mtype'].values)
+label_AGORA_nrg = list(AGORA_taxonomy['metabolism'].values)
+
+#%%
 rxns_PDGSM , met_PDGSM , gene_PDGSM , graphlist_PDGSM , flux_PDGSM = load_library(path_PDGSMM , path_ref_PDGSMM)    
 rxns_AGORA , met_AGORA , gene_AGORA , graphlist_AGORA , flux_AGORA = load_library(path_AGORA  , path_ref_AGORA)    
     
-    
-    
+#%%    
+
+def boxplots(df, label):
+    # Reactions/metabolites/genes content of the models, grouped by label
+
+    groups = df.T.sum(axis=1).groupby(label)
+
+    names = []
+    data = []
+
+    for g in groups:
+        names.append(g[0])
+        data.append(g[1].values)
+        
+    ax = sns.boxplot(data=data)
+    ax.set_xticklabels(labels = names,rotation=90)
+
+#   ax.get_figure().savefig(outfolder+'boxplots/'+c+'.png', dpi=1200, bbox_inches='tight')
+    plt.show()
 
 
+# Explorative Data Analysis (boxplots)
+# Reactions/metabolites/genes content of the models, grouped by label
+
+boxplots(rxns_AGORA, label_AGORA_gram)
+boxplots(rxns_AGORA, label_AGORA_oxy)
+boxplots(rxns_AGORA, label_AGORA_phylum)
+boxplots(rxns_AGORA, label_AGORA_type)
+boxplots(rxns_PDGSM, label_PDGSM)
+
+#%%
