@@ -18,9 +18,11 @@ import numpy as np
 import seaborn as sns
 import grakel as gk
 from scipy.spatial.distance import pdist , jaccard , squareform , hamming
-from matplotlib.pyplot import show
+
+from matplotlib import pyplot as plt
 from datetime import datetime
 import os
+import PIL
 
 def modelNet(model):
     #Returns a grakel.Graph object from a cobra.model object
@@ -51,18 +53,6 @@ def modelNet(model):
     g = gk.Graph(edges, node_labels=label_nodes, edge_labels=label_edges)
     return g
 
-def split_classes(df):
-    #splits bin matrices in class specific df's
-    df1 = pd.DataFrame()
-    df2 = pd.DataFrame()
-    
-    for c in df.columns:
-        if c.split('_')[0] == 'L':
-            df1[c] = df[c]
-        elif c.split('_')[0] == 'S':
-            df2[c] = df[c]
-    return df1 , df2
-
 def make_binary_mat(library_folder,ref_model):
     #returns 3 binary matrices containing info about wheter reaction/metabolite/gene[i] 
     # from parent model has beeen added in each "contextualized" model
@@ -71,7 +61,7 @@ def make_binary_mat(library_folder,ref_model):
     metabolite_matrix = pd.DataFrame(index=[m.id for m in ref_model.metabolites])
     gene_matrix = pd.DataFrame(index=[g.id for g in ref_model.genes])
 
-    for filename in os.listdir(library_folder):
+    for filename in sorted(os.listdir(library_folder)):
         model = cobra.io.read_sbml_model(library_folder+filename)
         rxns = []
         mets = []
@@ -114,8 +104,13 @@ def K_to_D(K):
     return D
 
 def savefig(plot, outfolder , title):
-    plot.get_figure().savefig(outfolder+title, dpi=300, bbox_inches='tight')
-       
+    plot.get_figure().savefig(outfolder+title, dpi=1200, bbox_inches='tight')
+
+def png2tif(outfolder):
+    for f in os.listdir(outfolder):
+        tif = PIL.Image.open(outfolder+f)
+        tif.save(outfolder+f[0:-3]+'tif')
+           
 def pw_dist_hist(M,metric):
     # plots hist of Kernel or Distance matrix
     
@@ -127,7 +122,9 @@ def pw_dist_hist(M,metric):
     M = M[M!=1]
     # reshape and plot hist
     M = M.values.reshape(10000,-1)
+      
     ax = pd.DataFrame(M).plot.hist(bins=100,figsize =(15,10),fontsize = 15, legend = False)
+    
     ax.set_xlabel(xlabel=metric,fontsize = 15)
     
     show()    
@@ -184,10 +181,11 @@ def classify(D,K,label):
     print("Accuracy SVM:", str(scores_K_SVM.mean().round(2)),'CV error:', scores_K_NN.std().round(2))
 
 # paths
-outfolder = '/home/acabbia/Dropbox/Bioinformatics-Distance2019/figures/'
-path = '/home/acabbia/Documents/Muscle_Model/models'
-ref_model_file = path + "/HMRdatabase.xml"
-library_folder = path + "/merged_100_2class/"
+outfolder = '/home/acabbia/Documents/Muscle_Model/GSMM-distance/figures/'
+library_folder= '/home/acabbia/Documents/Muscle_Model/models/AGORA_1.03/'
+ref_model_file = library_folder + "/AGORA_universe.xml"
+
+models_taxonomy = pd.read_csv('/home/acabbia/Documents/Muscle_Model/GSMM-distance/agora_taxonomy.tsv',sep = '\t')
 
 #%%
 ##################################################################################################################### 
@@ -199,42 +197,26 @@ print('Part 1: Exploratory analysis')
 ref_model = cobra.io.read_sbml_model(ref_model_file)
 reactions_matrix, metabolite_matrix, gene_matrix = make_binary_mat(library_folder, ref_model)
 
-# Content of models (Violin plots)
-R_df = pd.DataFrame()
-M_df = pd.DataFrame()
+# make boxplots of model content, grouped by label
 
-R_liver, R_skin = split_classes(reactions_matrix)
-M_liver, M_skin = split_classes(metabolite_matrix)
+def boxplots(df):
+    for c in  ['phylum', 'mclass', 'order','oxygenstat', 'gram']:
+        rr = df.T.sum(axis=1).groupby(models_taxonomy[c].values)
+    
+        names = []
+        data = []
+        for g in rr:
+            names.append(g[0])
+            data.append(g[1].values)
+            
+        ax = sns.boxplot(data=data)
+        ax.set_xticklabels(labels = names,rotation=90)
+        ax.get_figure().savefig(outfolder+'boxplots/'+c+'.png', dpi=1200, bbox_inches='tight')
+        plt.show()
 
-R_df["liver"] = R_liver.sum().values
-R_df["skin"] = R_skin.sum().values
-R_df = R_df.melt(var_name = "Tissue", value_name = 'n. reactions')
-ax = sns.violinplot(x="Tissue", y="n. reactions", data=R_df).set_title('Reactions content')
-show()
 
-M_df["liver"] = M_liver.sum().values
-M_df["skin"] = M_skin.sum().values
-M_df = M_df.melt(var_name = "Tissue", value_name = 'n. metabolites')
-ax = sns.violinplot(x="Tissue", y="n. metabolites", data=M_df).set_title('Metabolites content')
-show()
-
-# make labels dict
-dd = {'L' : 0, 'S': 1 }
-
-#### PCA plot
-pca = PCA(n_components=2)
-principalComponents = pca.fit_transform(reactions_matrix.T)
-principalDf = pd.DataFrame(data = principalComponents, columns = ['PC1', 'PC2'])
-
-principalDf['Tissue'] = [l.split('_')[0] for l in reactions_matrix.columns]
-principalDf['Tissue']=principalDf['Tissue'].replace('L','Liver')
-principalDf['Tissue']=principalDf['Tissue'].replace('S','Skin')
-
-sns.scatterplot(x='PC1',y='PC2', hue= 'Tissue', data=principalDf)
-
-# Figure: Network 
-# Figure: Cobra model structure
-
+boxplots(metabolite_matrix)
+boxplots(reactions_matrix)
 #####################################################################################################################
 
 ## Part 2: Metabolic reconstructions
